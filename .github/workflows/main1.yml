@@ -1,0 +1,55 @@
+name: Build and Push to ACR
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  ACR_NAME: ${{ secrets.ACR_NAME }}
+  IMAGE_NAME: ${{ secrets.IMAGE_NAME }}
+  IMAGE_TAG: ${{ secrets.IMAGE_TAG }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId":"${{ secrets.AZURE_CLIENT_ID }}",
+              "clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}",
+              "subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId":"${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      - name: Login to Azure Container Registry
+        run: |
+          az acr login --name $ACR_NAME
+
+      - name: Debug Azure context
+        run: |
+          echo "Current subscription:"
+          az account show --output table
+          echo "All accessible subscriptions:"
+          az account list --output table
+          echo "ACRs visible in current subscription:"
+          az acr list --output table
+          echo "ACR_NAME secret value being used:"
+          echo "$ACR_NAME"
+
+      - name: Build Docker Image
+        run: |
+          docker build \
+          -t $ACR_NAME.azurecr.io/$IMAGE_NAME:$IMAGE_TAG .
+
+      - name: Push Docker Image
+        run: |
+          docker push \
+          $ACR_NAME.azurecr.io/$IMAGE_NAME:$IMAGE_TAG
